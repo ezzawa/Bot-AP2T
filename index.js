@@ -140,7 +140,7 @@ function getHWID() {
 let hwid = getHWID();
 
 // Tampilkan Setup GUI jika konfigurasi belum lengkap
-if (!process.env.TELEGRAM_BOT_TOKEN || !process.env.OWNER_CHAT_ID || !process.env.LICENSE_KEY) {
+if (false) {
     console.log("Konfigurasi awal belum lengkap. Membuka Setup GUI...");
     const envPath = require('path').join(process.cwd(), '.env');
     const ps1Path = require('path').join(process.cwd(), 'setup_gui.ps1');
