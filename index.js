@@ -1,56 +1,13 @@
 require('dotenv').config();
 
 // ==========================================
-// 1. STEALTH & SINGLE-FILE LOGIC
+// 1. CEK SETUP & LOGIKA UTAMA
 // ==========================================
 
-const args = process.argv.slice(2);
-const isHiddenMode = args.includes('--hidden');
 const envPath = require('path').join(process.cwd(), '.env');
 const isSetupComplete = require('fs').existsSync(envPath);
 
-if (isSetupComplete) {
-    const startupFolder = require('child_process').execSync('powershell -command "[Environment]::GetFolderPath(\'Startup\')"').toString().trim();
-    const startupVbs = require('path').join(startupFolder, 'Bot_AP2T_Launcher.vbs');
-    const exePathSafe = process.execPath;
-    const cwdSafe = process.cwd();
-    // VBScript auto-start akan mengeksekusi EXE secara normal (tanpa --hidden)
-    const vbsCode = `Set WshShell = CreateObject("WScript.Shell")\nWshShell.CurrentDirectory = "${cwdSafe}"\nWshShell.Run """" & "${exePathSafe}" & """", 1, False\n`;
-    require('fs').writeFileSync(startupVbs, vbsCode);
-    
-    // Trik menyembunyikan layar hitam CMD secara gaib tanpa mematikan proses (hanya menyembunyikan visualnya)
-    if (!isHiddenMode) {
-        try {
-            const psHide = `$code = @"\nusing System;\nusing System.Runtime.InteropServices;\npublic class Win {\n[DllImport(""user32.dll"")] public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);\n[DllImport(""kernel32.dll"")] public static extern IntPtr GetConsoleWindow();\n}\n"@\nAdd-Type -TypeDefinition $code\n[Win]::ShowWindow([Win]::GetConsoleWindow(), 0)`;
-            require('child_process').execSync(`powershell -command "${psHide.replace(/\n/g, '; ')}"`, { stdio: 'ignore' });
-        } catch(e) {}
-    }
-}
-
-// ==========================================
-// 2. AUTO-START INJECTION LOGIC
-// ==========================================
-function ensureAutoStart() {
-    try {
-        const startupFolder = require('child_process').execSync('powershell -command "[Environment]::GetFolderPath(\'Startup\')"').toString().trim();
-        const startupVbs = require('path').join(startupFolder, 'Bot_AP2T_Launcher.vbs');
-        const exePathSafe = process.execPath.replace(/\\/g, '\\\\');
-        const cwdSafe = process.cwd().replace(/\\/g, '\\\\');
-        
-        // VBScript di folder startup untuk menjalankan bot secara tersembunyi
-        const vbsCode = `
-Set WshShell = CreateObject("WScript.Shell")
-WshShell.CurrentDirectory = "${cwdSafe}"
-WshShell.Run "cmd /c \"\"${exePathSafe}\"\" --hidden", 0, False
-`;
-        require('fs').writeFileSync(startupVbs, vbsCode);
-    } catch(e) {}
-}
-
-if (isSetupComplete) {
-    ensureAutoStart(); // Selalu pastikan VBS startup tertanam setiap kali bot menyala
-}
-// ==========================================
+// (Fitur auto-start sekarang dikendalikan murni oleh Install_Server.bat)
 
 
 
@@ -210,6 +167,11 @@ $form.ShowDialog() | Out-Null
     for (const k in envConfig) { process.env[k] = envConfig[k]; }
 }
 
+if (process.argv.includes('--setup-only')) {
+    console.log("Setup GUI selesai. Melanjutkan instalasi...");
+    process.exit(0);
+}
+
 const EXPECTED_LICENSE = crypto.createHash('md5').update(hwid + "PLN_AMAN_123").digest('hex').substring(0, 16).toUpperCase();
 const currentLicense = (process.env.LICENSE_KEY || '').trim().toUpperCase();
 const isLicensed = (currentLicense === EXPECTED_LICENSE);
@@ -243,7 +205,23 @@ function saveAccessList() {
 loadAccessList();
 
 // Super Admin (Pemilik Pertama dari .env)
-const SUPER_ADMIN_ID = (process.env.OWNER_CHAT_ID || '').split(',')[0].trim();
+let SUPER_ADMIN_ID = (process.env.OWNER_CHAT_ID || '').split(',')[0].trim();
+
+bot.onText(/^\/set_admin$/, (msg) => {
+    const chatId = msg.chat.id.toString();
+    if (SUPER_ADMIN_ID) {
+        return bot.sendMessage(chatId, `❌ Gagal! Super Admin sudah diatur (ID: ${SUPER_ADMIN_ID}). Jika ingin mengubahnya, silakan edit file .env secara manual menggunakan Notepad.`);
+    }
+    
+    SUPER_ADMIN_ID = chatId;
+    const envPath = require('path').join(process.cwd(), '.env');
+    try {
+        require('fs').appendFileSync(envPath, `\nOWNER_CHAT_ID=${chatId}`);
+        bot.sendMessage(chatId, `✅ **SUKSES!**\n\nAnda (\`${chatId}\`) telah resmi menjadi **Super Admin** bot ini!\nSekarang Anda bisa menggunakan perintah /tambah_akses untuk mendaftarkan ID pegawai lain.`, { parse_mode: 'Markdown' });
+    } catch(e) {
+        bot.sendMessage(chatId, `❌ Gagal menyimpan ke file .env: ${e.message}`);
+    }
+});
 
 // Middleware keamanan: Intercept semua perintah Telegram
 const originalOnText = bot.onText.bind(bot);
