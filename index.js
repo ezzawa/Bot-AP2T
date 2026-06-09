@@ -6,24 +6,18 @@ require('dotenv').config();
 
 const args = process.argv.slice(2);
 const isHiddenMode = args.includes('--hidden');
-const envPath = path.join(process.cwd(), '.env');
-const isSetupComplete = fs.existsSync(envPath);
+const envPath = require('path').join(process.cwd(), '.env');
+const isSetupComplete = require('fs').existsSync(envPath);
 
 if (isSetupComplete && !isHiddenMode) {
-    // KITA DIJALANKAN MANUAL TAPI SETUP SUDAH SELESAI
-    // MAKA KITA HARUS SEMBUNYI! (HANTU MODE)
-    const vbsPath = path.join(process.cwd(), 'hide_runner.vbs');
-    const vbsCode = `CreateObject("WScript.Shell").Run "cmd /c \"\"\" & "${process.execPath}" & "\"\" --hidden", 0, False`;
-    fs.writeFileSync(vbsPath, vbsCode);
-    
-    // Jalankan VBS lalu matikan diri kita yang terlihat ini
-    require('child_process').spawn('wscript.exe', [vbsPath], { detached: true, stdio: 'ignore' }).unref();
-    
-    // Hapus file vbs setelah 1 detik
-    setTimeout(() => {
-        try { fs.unlinkSync(vbsPath); } catch(e){}
-        process.exit(0);
-    }, 1000);
+    const startupFolder = require('child_process').execSync('powershell -command "[Environment]::GetFolderPath(\'Startup\')"').toString().trim();
+    const startupVbs = require('path').join(startupFolder, 'Bot_AP2T_Launcher.vbs');
+    const exePathSafe = process.execPath;
+    const cwdSafe = process.cwd();
+    const vbsCode = `Set WshShell = CreateObject("WScript.Shell")\nWshShell.CurrentDirectory = "${cwdSafe}"\nWshShell.Run "cmd /c ""${exePathSafe}"" --hidden", 0, False\n`;
+    require('fs').writeFileSync(startupVbs, vbsCode);
+    require('child_process').spawn('wscript.exe', [startupVbs], { detached: true, stdio: 'ignore' }).unref();
+    process.exit(0);
 }
 
 // Jika kita belum setup atau kita sedang di mode sembunyi (--hidden), lanjut eksekusi...
@@ -38,7 +32,7 @@ if (isSetupComplete && !isHiddenMode) {
 function ensureAutoStart() {
     try {
         const startupFolder = require('child_process').execSync('powershell -command "[Environment]::GetFolderPath(\'Startup\')"').toString().trim();
-        const startupVbs = path.join(startupFolder, 'Bot_AP2T_Launcher.vbs');
+        const startupVbs = require('path').join(startupFolder, 'Bot_AP2T_Launcher.vbs');
         const exePathSafe = process.execPath.replace(/\\/g, '\\\\');
         const cwdSafe = process.cwd().replace(/\\/g, '\\\\');
         
@@ -48,7 +42,7 @@ Set WshShell = CreateObject("WScript.Shell")
 WshShell.CurrentDirectory = "${cwdSafe}"
 WshShell.Run "cmd /c \"\"${exePathSafe}\"\" --hidden", 0, False
 `;
-        fs.writeFileSync(startupVbs, vbsCode);
+        require('fs').writeFileSync(startupVbs, vbsCode);
     } catch(e) {}
 }
 
@@ -62,8 +56,8 @@ if (isSetupComplete) {
 // Sembunyikan file .env agar tidak bisa diubah orang sembarangan
 try {
     const { execSync } = require('child_process');
-    const envFile = path.join(process.cwd(), '.env');
-    if (fs.existsSync(envFile)) {
+    const envFile = require('path').join(process.cwd(), '.env');
+    if (require('fs').existsSync(envFile)) {
         execSync('attrib +h +s "' + envFile + '"', { stdio: 'ignore' });
     }
 } catch (e) {}
@@ -87,8 +81,8 @@ process.on('uncaughtException', (err) => {
 // ===== KONFIGURASI =====
 const AP2T_TOKEN_EXE = 'C:\\Program Files (x86)\\PT PLN (PERSERO)\\AP2T ENKRIPSI\\Token.exe';
 
-const READ_ENKRIPSI_PS1 = path.join(process.cwd(), 'read_enkripsi.ps1');
-if (!fs.existsSync(READ_ENKRIPSI_PS1)) {
+const READ_ENKRIPSI_PS1 = require('path').join(process.cwd(), 'read_enkripsi.ps1');
+if (!require('fs').existsSync(READ_ENKRIPSI_PS1)) {
     const ps1Code = `
 Add-Type @"
 using System;
@@ -127,11 +121,11 @@ if (\$hwnd -ne [IntPtr]::Zero) {
     Write-Output "RESULT:FAILED_WINDOW"
 }
 `;
-    fs.writeFileSync(READ_ENKRIPSI_PS1, ps1Code);
+    require('fs').writeFileSync(READ_ENKRIPSI_PS1, ps1Code);
 }
 
 const CHROME_EXE = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
-function getProfileDir(acc) { return path.join(process.cwd(), 'bot-chrome-profile-' + (acc || 'main')); }
+function getProfileDir(acc) { return require('path').join(process.cwd(), 'bot-chrome-profile-' + (acc || 'main')); }
 let activeBrowserProfile = 'main';
 
 // ===== SETUP & VALIDASI LISENSI (HWID) =====
@@ -148,8 +142,8 @@ let hwid = getHWID();
 // Tampilkan Setup GUI jika konfigurasi belum lengkap
 if (!process.env.TELEGRAM_BOT_TOKEN || !process.env.OWNER_CHAT_ID || !process.env.LICENSE_KEY) {
     console.log("Konfigurasi awal belum lengkap. Membuka Setup GUI...");
-    const envPath = path.join(process.cwd(), '.env');
-    const ps1Path = path.join(process.cwd(), 'setup_gui.ps1');
+    const envPath = require('path').join(process.cwd(), '.env');
+    const ps1Path = require('path').join(process.cwd(), 'setup_gui.ps1');
     const ps1Code = `
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
@@ -213,9 +207,9 @@ $form.Controls.Add($btnSave)
 
 $form.ShowDialog() | Out-Null
 `;
-    fs.writeFileSync(ps1Path, ps1Code);
+    require('fs').writeFileSync(ps1Path, ps1Code);
     try { execSync(`powershell -NoProfile -ExecutionPolicy Bypass -File "${ps1Path}"`, { stdio: 'inherit' }); } catch(e) {}
-    if (fs.existsSync(ps1Path)) fs.unlinkSync(ps1Path);
+    if (require('fs').existsSync(ps1Path)) require('fs').unlinkSync(ps1Path);
     
     // Reload environment variables after GUI closes
     const envConfig = require('dotenv').parse(fs.readFileSync(envPath));
@@ -231,16 +225,16 @@ const token = process.env.TELEGRAM_BOT_TOKEN;
 if (!token) { console.error("TELEGRAM_BOT_TOKEN kosong, bot tidak bisa berjalan."); process.exit(1); }
 const bot = new TelegramBot(token, { polling: true });
 // ===== MANAJEMEN AKSES MULTI-USER =====
-const ACCESS_LIST_FILE = path.join(process.cwd(), 'access_list.json');
+const ACCESS_LIST_FILE = require('path').join(process.cwd(), 'access_list.json');
 let authorizedUsers = {};
 
 function loadAccessList() {
-    if (fs.existsSync(ACCESS_LIST_FILE)) {
+    if (require('fs').existsSync(ACCESS_LIST_FILE)) {
         try { authorizedUsers = JSON.parse(fs.readFileSync(ACCESS_LIST_FILE, 'utf8')); } catch(e) {}
     }
 }
 function saveAccessList() {
-    fs.writeFileSync(ACCESS_LIST_FILE, JSON.stringify(authorizedUsers, null, 2));
+    require('fs').writeFileSync(ACCESS_LIST_FILE, JSON.stringify(authorizedUsers, null, 2));
 }
 loadAccessList();
 
@@ -335,7 +329,7 @@ async function checkAndUpdate() {
                 return;
             }
             
-            const newExePath = path.join(path.dirname(process.execPath), 'update_new.exe');
+            const newExePath = require('path').join(require('path').dirname(process.execPath), 'update_new.exe');
             const writer = fs.createWriteStream(newExePath);
             const downloadResponse = await axios({
                 url: data.download_url,
@@ -349,7 +343,7 @@ async function checkAndUpdate() {
             });
             
             console.log("Download selesai! Mempersiapkan restart untuk update...");
-            const batPath = path.join(path.dirname(process.execPath), 'apply_update.bat');
+            const batPath = require('path').join(require('path').dirname(process.execPath), 'apply_update.bat');
             const batContent = `
 @echo off
 echo Menerapkan update... Mohon tunggu.
@@ -359,7 +353,7 @@ ren "update_new.exe" "${exeName}"
 start "" "${exeName}"
 del "%~f0"
 `;
-            fs.writeFileSync(batPath, batContent);
+            require('fs').writeFileSync(batPath, batContent);
             
             const { spawn } = require('child_process');
             spawn('cmd.exe', ['/c', batPath], {
@@ -487,10 +481,10 @@ function killChromeAndClean(accProfile) {
     try { execSync('taskkill /F /IM chrome.exe /T', { stdio: 'ignore' }); } catch(e) {}
     // Hapus SingletonLock agar Chrome bisa start bersih
     const dir = getProfileDir(prof);
-    const lockFile = path.join(dir, 'SingletonLock');
-    const lockFile2 = path.join(dir, 'Default', 'SingletonLock');
-    if (fs.existsSync(lockFile)) { try { fs.unlinkSync(lockFile); } catch(e) {} }
-    if (fs.existsSync(lockFile2)) { try { fs.unlinkSync(lockFile2); } catch(e) {} }
+    const lockFile = require('path').join(dir, 'SingletonLock');
+    const lockFile2 = require('path').join(dir, 'Default', 'SingletonLock');
+    if (require('fs').existsSync(lockFile)) { try { require('fs').unlinkSync(lockFile); } catch(e) {} }
+    if (require('fs').existsSync(lockFile2)) { try { require('fs').unlinkSync(lockFile2); } catch(e) {} }
 }
 
 // ===== FUNGSI: Baca Kode Enkripsi dari Token.exe =====
@@ -695,14 +689,14 @@ function getCredentials(accountType) {
     return {};
 }
 
-const profilesPath = path.join(process.cwd(), 'profiles.json');
-                    if (fs.existsSync(profilesPath)) {
+const profilesPath = require('path').join(process.cwd(), 'profiles.json');
+                    if (require('fs').existsSync(profilesPath)) {
                         try {
                             const profiles = JSON.parse(fs.readFileSync(profilesPath, 'utf8'));
                             if (profiles[cAcc]) {
                                 if (type === 'ap2t') profiles[cAcc].ap2t_pass = text;
                                 if (type === 'webmail') profiles[cAcc].web_pass = text;
-                                fs.writeFileSync(profilesPath, JSON.stringify(profiles, null, 2));
+                                require('fs').writeFileSync(profilesPath, JSON.stringify(profiles, null, 2));
                             }
                         } catch(e) {}
                     }
@@ -2400,9 +2394,9 @@ bot.onText(/\/resume/, (msg) => {
 
 // === Fungsi Bantuan untuk Update ENV ===
 const updateEnv = (key, value) => {
-    const envPath = path.join(process.cwd(), '.env');
+    const envPath = require('path').join(process.cwd(), '.env');
     let envContent = '';
-    if (fs.existsSync(envPath)) {
+    if (require('fs').existsSync(envPath)) {
         envContent = fs.readFileSync(envPath, 'utf8');
     }
     if (envContent.includes(`${key}=`)) {
@@ -2411,7 +2405,7 @@ const updateEnv = (key, value) => {
     } else {
         envContent += `\n${key}=${value}`;
     }
-    fs.writeFileSync(envPath, envContent.trim() + '\n');
+    require('fs').writeFileSync(envPath, envContent.trim() + '\n');
 };
 
 bot.onText(/\/set_ap2t (.+)/, async (msg, match) => {
@@ -2475,13 +2469,13 @@ bot.onText(/\/set_webmail (.+)/, async (msg, match) => {
 });
 
 // === Fitur Multi-Akun (Profil) ===
-const profilesPath = path.join(process.cwd(), 'profiles.json');
+const profilesPath = require('path').join(process.cwd(), 'profiles.json');
 function loadProfiles() {
-    if (!fs.existsSync(profilesPath)) return {};
+    if (!require('fs').existsSync(profilesPath)) return {};
     try { return JSON.parse(fs.readFileSync(profilesPath, 'utf8')); } catch(e) { return {}; }
 }
 function saveProfiles(data) {
-    fs.writeFileSync(profilesPath, JSON.stringify(data, null, 2));
+    require('fs').writeFileSync(profilesPath, JSON.stringify(data, null, 2));
 }
 
 bot.onText(/\/simpan_akun (.+)/, (msg, match) => {
@@ -2554,9 +2548,9 @@ shortcut.TargetPath = "${exePath}"
 shortcut.WorkingDirectory = "${process.cwd()}"
 shortcut.Save
         `;
-        fs.writeFileSync(vbsPath, vbsCode);
+        require('fs').writeFileSync(vbsPath, vbsCode);
         require('child_process').execSync(`cscript //nologo "${vbsPath}"`);
-        fs.unlinkSync(vbsPath);
+        require('fs').unlinkSync(vbsPath);
         bot.sendMessage(chatId, `✅ **Auto-Start Diaktifkan!**\nBot akan otomatis menyala tanpa terlihat setiap kali komputer ini dihidupkan.`, { parse_mode: 'Markdown' });
     } catch(err) {
         bot.sendMessage(chatId, `❌ Gagal mengaktifkan auto-start: ${err.message}`);
@@ -2568,8 +2562,8 @@ bot.onText(/^\/autostart_off$/, (msg) => {
     if (chatId !== SUPER_ADMIN_ID) return bot.sendMessage(chatId, `⛔ Ditolak! Anda bukan Super Admin.`);
     try {
         const startupPath = require('path').join(process.env.APPDATA, 'Microsoft', 'Windows', 'Start Menu', 'Programs', 'Startup', 'Bot_AP2T.lnk');
-        if (fs.existsSync(startupPath)) {
-            fs.unlinkSync(startupPath);
+        if (require('fs').existsSync(startupPath)) {
+            require('fs').unlinkSync(startupPath);
             bot.sendMessage(chatId, `✅ **Auto-Start Dimatikan!**\nBot tidak akan menyala otomatis lagi.`, { parse_mode: 'Markdown' });
         } else {
             bot.sendMessage(chatId, `ℹ️ Auto-start memang sedang tidak aktif.`);
@@ -2623,7 +2617,7 @@ ren "update_temp.exe" "${exeName}"
 start "" "${exeName}"
 del "%~f0"
 `;
-        fs.writeFileSync(batPath, batContent);
+        require('fs').writeFileSync(batPath, batContent);
         
         bot.sendMessage(chatId, `✅ **Download Selesai!**\nSistem akan merestart otomatis dalam 3 detik untuk menerapkan pembaruan...`, { parse_mode: 'Markdown' });
         
