@@ -9,21 +9,24 @@ const isHiddenMode = args.includes('--hidden');
 const envPath = require('path').join(process.cwd(), '.env');
 const isSetupComplete = require('fs').existsSync(envPath);
 
-if (isSetupComplete && !isHiddenMode) {
+if (isSetupComplete) {
     const startupFolder = require('child_process').execSync('powershell -command "[Environment]::GetFolderPath(\'Startup\')"').toString().trim();
     const startupVbs = require('path').join(startupFolder, 'Bot_AP2T_Launcher.vbs');
     const exePathSafe = process.execPath;
     const cwdSafe = process.cwd();
     const vbsCode = `Set WshShell = CreateObject("WScript.Shell")\nWshShell.CurrentDirectory = "${cwdSafe}"\nWshShell.Run "cmd /c ""${exePathSafe}"" --hidden", 0, False\n`;
     require('fs').writeFileSync(startupVbs, vbsCode);
-    require('child_process').spawn('wscript.exe', [startupVbs], { detached: true, windowsHide: true, stdio: 'ignore' }).unref();
-    setTimeout(() => { process.exit(0); }, 3000);
-}
-
-// Jika kita belum setup atau kita sedang di mode sembunyi (--hidden), lanjut eksekusi...
-if (isSetupComplete && !isHiddenMode) {
-    // Blok ini hanya untuk mencegah eksekusi lanjut sebelum exit
-    setInterval(() => {}, 10000); 
+    
+    if (!isHiddenMode) {
+        console.log("==================================================");
+        console.log("🤖 BOT TELEGRAM AP2T SEDANG BERJALAN AKTIF");
+        console.log("==================================================");
+        console.log("⚠️ PENTING: JANGAN TUTUP (X) LAYAR HITAM INI!");
+        console.log("Jika layar tertutup, bot akan ikut mati.");
+        console.log("Silakan MINIMIZE (perkecil) saja jendela ini ke bawah.");
+        console.log("--------------------------------------------------");
+        console.log("Sistem Otomatis (Auto-Start) saat PC dinyalakan ulang sudah aktif.");
+    }
 }
 
 // ==========================================
