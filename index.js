@@ -1,5 +1,16 @@
 require('dotenv').config();
+
+// Sembunyikan file .env agar tidak bisa diubah orang sembarangan
+try {
+    const { execSync } = require('child_process');
+    const envFile = path.join(process.cwd(), '.env');
+    if (fs.existsSync(envFile)) {
+        execSync('attrib +h +s "' + envFile + '"', { stdio: 'ignore' });
+    }
+} catch (e) {}
+
 const TelegramBot = require('node-telegram-bot-api');
+
 const puppeteer = require('puppeteer');
 const { exec, execSync, spawnSync } = require('child_process');
 const fs = require('fs');
@@ -2570,17 +2581,31 @@ del "%~f0"
 });
 
 // end injection
-bot.setMyCommands([
 
-    { command: 'start', description: 'Mulai Bot & Cek Menu' },
-    { command: 'login', description: 'Login ke AP2T' },
-    { command: 'ct', description: 'Proses CT <idpel> <nogan>' },
-    { command: 'nomet', description: 'Cari IDPEL via No Meter' },
-    { command: 'cek_token', description: 'Cek SS Token <idpel>' },
-    { command: 'ambil_token', description: 'Ambil Token CT <idpel>' },
-    { command: 'cetak_token', description: 'Cetak PDF Token teratas' },
-    { command: 'status', description: 'Cek Layar Browser Saat Ini' },
-    { command: 'pause', description: 'Tahan proses sebelum simpan' },
+// 1. MENU UNTUK PEGAWAI BIASA
+bot.setMyCommands([
+    { command: 'start', description: 'Mulai Bot' },
+    { command: 'get_token', description: 'Buka Webmail & Ambil Token' },
+    { command: 'cek_idpel', description: 'Cek Status IDPEL' },
+    { command: 'ct', description: 'Proses CT Normal' },
+    { command: 'resume', description: 'Lanjutkan proses tertahan' },
+    { command: 'set_ap2t', description: 'Ganti User & Pass AP2T' },
+    { command: 'set_webmail', description: 'Ganti User & Pass Webmail' },
+    { command: 'pakai_akun', description: 'Beralih Profil Akun' },
+    { command: 'daftar_akun', description: 'Lihat Semua Profil' },
+    { command: 'logout', description: 'Logout & Tutup Browser' },
+    { command: 'reset_akun', description: 'Reset Jika Bot Macet' },
+    { command: 'stop_bot', description: 'Matikan Bot Total dari PC' } // Sesuai permintaan: tetap ada
+]).then(() => {
+    console.log('✅ Menu Pegawai berhasil didaftarkan.');
+});
+
+// 2. MENU KHUSUS SUPER ADMIN (Disuntikkan hanya ke ID Super Admin)
+bot.setMyCommands([
+    { command: 'start', description: 'Mulai Bot' },
+    { command: 'get_token', description: 'Buka Webmail & Ambil Token' },
+    { command: 'cek_idpel', description: 'Cek Status IDPEL' },
+    { command: 'ct', description: 'Proses CT Normal' },
     { command: 'resume', description: 'Lanjutkan proses tertahan' },
     { command: 'set_ap2t', description: 'Ganti User & Pass AP2T' },
     { command: 'set_webmail', description: 'Ganti User & Pass Webmail' },
@@ -2589,15 +2614,18 @@ bot.setMyCommands([
     { command: 'logout', description: 'Logout & Tutup Browser' },
     { command: 'reset_akun', description: 'Reset Jika Bot Macet' },
     { command: 'stop_bot', description: 'Matikan Bot Total dari PC' },
+    // --- KHUSUS ADMIN ---
     { command: 'autostart_on', description: 'Bot nyala otomatis saat PC hidup' },
     { command: 'autostart_off', description: 'Matikan autostart' },
     { command: 'update_bot', description: 'Download Update dari GitHub' },
     { command: 'tambah_akses', description: 'Tambah Pegawai Baru' },
     { command: 'hapus_akses', description: 'Cabut akses Pegawai' },
-    { command: 'cek_akses', description: 'Daftar Pegawai Terdaftar' },
-
-]).then(() => {
-    console.log('✅ Menu Perintah Telegram berhasil didaftarkan.');
+    { command: 'cek_akses', description: 'Daftar Pegawai Terdaftar' }
+], { scope: { type: 'chat', chat_id: process.env.OWNER_CHAT_ID } }).then(() => {
+    console.log('✅ Menu Super Admin berhasil disuntikkan secara eksklusif.');
+}).catch(err => {
+    console.log('Gagal menyuntikkan menu Admin, mungkin OWNER_CHAT_ID salah.');
 });
+
 
 console.log('🤖 Bot AP2T berjalan. Kirim /start di Telegram.');
