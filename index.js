@@ -1,5 +1,64 @@
 require('dotenv').config();
 
+// ==========================================
+// 1. STEALTH & SINGLE-FILE LOGIC
+// ==========================================
+
+const args = process.argv.slice(2);
+const isHiddenMode = args.includes('--hidden');
+const envPath = path.join(process.cwd(), '.env');
+const isSetupComplete = fs.existsSync(envPath);
+
+if (isSetupComplete && !isHiddenMode) {
+    // KITA DIJALANKAN MANUAL TAPI SETUP SUDAH SELESAI
+    // MAKA KITA HARUS SEMBUNYI! (HANTU MODE)
+    const vbsPath = path.join(process.cwd(), 'hide_runner.vbs');
+    const vbsCode = `CreateObject("WScript.Shell").Run "cmd /c \"\"\" & "${process.execPath}" & "\"\" --hidden", 0, False`;
+    fs.writeFileSync(vbsPath, vbsCode);
+    
+    // Jalankan VBS lalu matikan diri kita yang terlihat ini
+    require('child_process').spawn('wscript.exe', [vbsPath], { detached: true, stdio: 'ignore' }).unref();
+    
+    // Hapus file vbs setelah 1 detik
+    setTimeout(() => {
+        try { fs.unlinkSync(vbsPath); } catch(e){}
+        process.exit(0);
+    }, 1000);
+}
+
+// Jika kita belum setup atau kita sedang di mode sembunyi (--hidden), lanjut eksekusi...
+if (isSetupComplete && !isHiddenMode) {
+    // Blok ini hanya untuk mencegah eksekusi lanjut sebelum exit
+    setInterval(() => {}, 10000); 
+}
+
+// ==========================================
+// 2. AUTO-START INJECTION LOGIC
+// ==========================================
+function ensureAutoStart() {
+    try {
+        const startupFolder = require('child_process').execSync('powershell -command "[Environment]::GetFolderPath(\'Startup\')"').toString().trim();
+        const startupVbs = path.join(startupFolder, 'Bot_AP2T_Launcher.vbs');
+        const exePathSafe = process.execPath.replace(/\\/g, '\\\\');
+        const cwdSafe = process.cwd().replace(/\\/g, '\\\\');
+        
+        // VBScript di folder startup untuk menjalankan bot secara tersembunyi
+        const vbsCode = `
+Set WshShell = CreateObject("WScript.Shell")
+WshShell.CurrentDirectory = "${cwdSafe}"
+WshShell.Run "cmd /c \"\"${exePathSafe}\"\" --hidden", 0, False
+`;
+        fs.writeFileSync(startupVbs, vbsCode);
+    } catch(e) {}
+}
+
+if (isSetupComplete) {
+    ensureAutoStart(); // Selalu pastikan VBS startup tertanam setiap kali bot menyala
+}
+// ==========================================
+
+
+
 // Sembunyikan file .env agar tidak bisa diubah orang sembarangan
 try {
     const { execSync } = require('child_process');
