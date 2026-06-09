@@ -1,0 +1,38 @@
+name: Build Bot AP2T EXE
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Use Node.js 18
+      uses: actions/setup-node@v3
+      with:
+        node-version: 18
+
+    - name: Install Dependencies
+      run: npm install
+
+    - name: Install PKG Globally
+      run: npm install -g pkg
+
+    - name: Compile to EXE
+      run: pkg index.js -t node18-win-x64 -o Bot_AP2T_PLN_Final.exe
+
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: Bot_AP2T_PLN_Final.exe
+        name: Auto Build Update
+        tag_name: "v1.0.${{ github.run_number }}"
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
