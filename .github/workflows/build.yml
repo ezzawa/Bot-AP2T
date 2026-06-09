@@ -21,6 +21,8 @@ jobs:
 
     - name: Install Dependencies
       run: npm install
+      env:
+        PUPPETEER_SKIP_DOWNLOAD: true
 
     - name: Install PKG Globally
       run: npm install -g pkg
