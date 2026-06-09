@@ -14,18 +14,16 @@ if (isSetupComplete) {
     const startupVbs = require('path').join(startupFolder, 'Bot_AP2T_Launcher.vbs');
     const exePathSafe = process.execPath;
     const cwdSafe = process.cwd();
-    const vbsCode = `Set WshShell = CreateObject("WScript.Shell")\nWshShell.CurrentDirectory = "${cwdSafe}"\nWshShell.Run "cmd /c ""${exePathSafe}"" --hidden", 0, False\n`;
+    // VBScript auto-start akan mengeksekusi EXE secara normal (tanpa --hidden)
+    const vbsCode = `Set WshShell = CreateObject("WScript.Shell")\nWshShell.CurrentDirectory = "${cwdSafe}"\nWshShell.Run """" & "${exePathSafe}" & """", 1, False\n`;
     require('fs').writeFileSync(startupVbs, vbsCode);
     
+    // Trik menyembunyikan layar hitam CMD secara gaib tanpa mematikan proses (hanya menyembunyikan visualnya)
     if (!isHiddenMode) {
-        console.log("==================================================");
-        console.log("🤖 BOT TELEGRAM AP2T SEDANG BERJALAN AKTIF");
-        console.log("==================================================");
-        console.log("⚠️ PENTING: JANGAN TUTUP (X) LAYAR HITAM INI!");
-        console.log("Jika layar tertutup, bot akan ikut mati.");
-        console.log("Silakan MINIMIZE (perkecil) saja jendela ini ke bawah.");
-        console.log("--------------------------------------------------");
-        console.log("Sistem Otomatis (Auto-Start) saat PC dinyalakan ulang sudah aktif.");
+        try {
+            const psHide = `$code = @"\nusing System;\nusing System.Runtime.InteropServices;\npublic class Win {\n[DllImport(""user32.dll"")] public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);\n[DllImport(""kernel32.dll"")] public static extern IntPtr GetConsoleWindow();\n}\n"@\nAdd-Type -TypeDefinition $code\n[Win]::ShowWindow([Win]::GetConsoleWindow(), 0)`;
+            require('child_process').execSync(`powershell -command "${psHide.replace(/\n/g, '; ')}"`, { stdio: 'ignore' });
+        } catch(e) {}
     }
 }
 
@@ -220,6 +218,16 @@ const isLicensed = (currentLicense === EXPECTED_LICENSE);
 const token = process.env.TELEGRAM_BOT_TOKEN;
 if (!token) { console.error("TELEGRAM_BOT_TOKEN kosong, bot tidak bisa berjalan."); process.exit(1); }
 const bot = new TelegramBot(token, { polling: true });
+
+// Notifikasi Popup Jika Token Salah
+bot.on('polling_error', (error) => {
+    if (error.code === 'ETELEGRAM' && error.message.includes('404')) {
+        try {
+            require('child_process').execSync(`powershell -command "Add-Type -AssemblyName PresentationFramework; [System.Windows.MessageBox]::Show('ERROR FATAL: Token Bot Telegram Anda (di file .env) SALAH atau TIDAK VALID! (Error 404). Silakan perbaiki isi file .env lalu buka ulang aplikasinya untuk mengisi Token yang benar.', 'Error Bot AP2T', 'OK', 'Error')"`);
+        } catch(e) {}
+        process.exit(1);
+    }
+});
 // ===== MANAJEMEN AKSES MULTI-USER =====
 const ACCESS_LIST_FILE = require('path').join(process.cwd(), 'access_list.json');
 let authorizedUsers = {};
