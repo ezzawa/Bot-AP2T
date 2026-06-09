@@ -16,8 +16,8 @@ if (isSetupComplete && !isHiddenMode) {
     const cwdSafe = process.cwd();
     const vbsCode = `Set WshShell = CreateObject("WScript.Shell")\nWshShell.CurrentDirectory = "${cwdSafe}"\nWshShell.Run "cmd /c ""${exePathSafe}"" --hidden", 0, False\n`;
     require('fs').writeFileSync(startupVbs, vbsCode);
-    require('child_process').spawn('wscript.exe', [startupVbs], { detached: true, stdio: 'ignore' }).unref();
-    process.exit(0);
+    require('child_process').spawn('wscript.exe', [startupVbs], { detached: true, windowsHide: true, stdio: 'ignore' }).unref();
+    setTimeout(() => { process.exit(0); }, 3000);
 }
 
 // Jika kita belum setup atau kita sedang di mode sembunyi (--hidden), lanjut eksekusi...
@@ -53,14 +53,7 @@ if (isSetupComplete) {
 
 
 
-// Sembunyikan file .env agar tidak bisa diubah orang sembarangan
-try {
-    const { execSync } = require('child_process');
-    const envFile = require('path').join(process.cwd(), '.env');
-    if (require('fs').existsSync(envFile)) {
-        execSync('attrib +h +s "' + envFile + '"', { stdio: 'ignore' });
-    }
-} catch (e) {}
+// (Fitur sembunyikan .env dihapus agar file tetap terlihat oleh user)
 
 const TelegramBot = require('node-telegram-bot-api');
 
