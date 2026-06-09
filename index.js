@@ -2557,63 +2557,54 @@ bot.onText(/^\/autostart_off$/, (msg) => {
 
 bot.onText(/^\/update_bot$/, async (msg) => {
     const chatId = msg.chat.id.toString();
-    if (chatId !== SUPER_ADMIN_ID) return bot.sendMessage(chatId, `⛔ Ditolak! Anda bukan Super Admin.`);
+    if (chatId !== SUPER_ADMIN_ID) return bot.sendMessage(chatId, `❌ Ditolak! Anda bukan Super Admin.`);
     
-    bot.sendMessage(chatId, `🔄 **Mengecek versi terbaru di GitHub...**\nMohon tunggu sekitar 10-30 detik...\nPastikan Anda sudah menaruh GITHUB_REPO di file .env`, { parse_mode: 'Markdown' });
+    bot.sendMessage(chatId, `🔄 **Mengecek versi terbaru di GitHub...**\nMohon tunggu...`, { parse_mode: 'Markdown' });
     try {
-        const githubRepo = process.env.GITHUB_REPO;
-        if (!githubRepo) {
-            return bot.sendMessage(chatId, `❌ Variabel GITHUB_REPO belum disetting di .env!\n\nSilakan buka file .env dan tambahkan:\n\`GITHUB_REPO=username/nama-repo\`\n(Dan \`GITHUB_TOKEN=...\` jika repo di-private).`, { parse_mode: 'Markdown' });
+        const rawUrl = 'https://raw.githubusercontent.com/ezzawa/Bot-AP2T/main/index.js';
+        const res = await axios.get(rawUrl);
+        const newCode = res.data;
+        
+        const currentCode = fs.readFileSync(__filename, 'utf8');
+        
+        if (newCode === currentCode) {
+            return bot.sendMessage(chatId, `✅ Bot sudah menggunakan versi paling terbaru dari GitHub.`);
         }
         
-        const headers = {};
-        if (process.env.GITHUB_TOKEN) headers['Authorization'] = `token ${process.env.GITHUB_TOKEN}`;
+        bot.sendMessage(chatId, `⬇️ **Pembaruan ditemukan!**\nSedang menginstall kode terbaru...`, { parse_mode: 'Markdown' });
         
-        const apiRes = await axios.get(`https://api.github.com/repos/${githubRepo}/releases/latest`, { headers });
-        const assets = apiRes.data.assets;
-        const exeAsset = assets.find(a => a.name.endsWith('.exe'));
+        fs.writeFileSync(__filename, newCode);
         
-        if (!exeAsset) return bot.sendMessage(chatId, `❌ Tidak ditemukan file .exe pada rilis terbaru di GitHub!`);
+        await bot.sendMessage(chatId, `✅ **Pembaruan Berhasil!**\nBot akan me-restart dirinya sendiri dalam 3 detik...`);
         
-        bot.sendMessage(chatId, `📥 **Mendownload pembaruan...**\nVersi: ${apiRes.data.tag_name}\nUkuran: ${(exeAsset.size / 1024 / 1024).toFixed(2)} MB`, { parse_mode: 'Markdown' });
+        setTimeout(() => {
+            process.exit(0); // Watchdog VBS akan otomatis menyalakannya kembali
+        }, 3000);
         
-        const downloadRes = await axios.get(exeAsset.url, { headers: { ...headers, Accept: 'application/octet-stream' }, responseType: 'stream' });
-        const newExePath = require('path').join(process.cwd(), 'update_temp.exe');
-        const writer = fs.createWriteStream(newExePath);
-        downloadRes.data.pipe(writer);
-        
-        await new Promise((resolve, reject) => {
-            writer.on('finish', resolve);
-            writer.on('error', reject);
-        });
-        
-        const currentExe = process.execPath;
-        const batPath = require('path').join(process.cwd(), 'update.bat');
-        // Get the filename of currentExe
-        const exeName = require('path').basename(currentExe);
-        const batContent = `
-@echo off
-timeout /t 3 /nobreak > NUL
-del "${currentExe}"
-ren "update_temp.exe" "${exeName}"
-start "" "${exeName}"
-del "%~f0"
-`;
-        require('fs').writeFileSync(batPath, batContent);
-        
-        bot.sendMessage(chatId, `✅ **Download Selesai!**\nSistem akan merestart otomatis dalam 3 detik untuk menerapkan pembaruan...`, { parse_mode: 'Markdown' });
-        
-        const { spawn } = require('child_process');
-        const p = spawn('cmd.exe', ['/c', batPath], { detached: true, stdio: 'ignore' });
-        p.unref();
-        
-        setTimeout(() => process.exit(0), 500);
-    } catch(err) {
-        let msgErr = err.message;
-        if (err.response) msgErr += ` (${err.response.status})`;
-        bot.sendMessage(chatId, `❌ Gagal melakukan update:\n${msgErr}`);
+    } catch (e) {
+        bot.sendMessage(chatId, `❌ Gagal mengecek pembaruan: ${e.message}`);
     }
 });
+
+// Auto-Update Check at Startup
+async function autoUpdateOnStartup() {
+    try {
+        const rawUrl = 'https://raw.githubusercontent.com/ezzawa/Bot-AP2T/main/index.js';
+        const res = await axios.get(rawUrl);
+        const newCode = res.data;
+        const currentCode = fs.readFileSync(__filename, 'utf8');
+        
+        if (newCode !== currentCode) {
+            console.log("Pembaruan ditemukan di GitHub! Menginstall...");
+            fs.writeFileSync(__filename, newCode);
+            console.log("Restarting untuk menerapkan pembaruan...");
+            process.exit(0);
+        }
+    } catch (e) {
+        console.error("Auto-Update Error:", e.message);
+    }
+}
+autoUpdateOnStartup();
 
 // end injection
 
@@ -2650,8 +2641,6 @@ bot.setMyCommands([
     { command: 'reset_akun', description: 'Reset Jika Bot Macet' },
     { command: 'stop_bot', description: 'Matikan Bot Total dari PC' },
     // --- KHUSUS ADMIN ---
-    { command: 'autostart_on', description: 'Bot nyala otomatis saat PC hidup' },
-    { command: 'autostart_off', description: 'Matikan autostart' },
     { command: 'update_bot', description: 'Download Update dari GitHub' },
     { command: 'tambah_akses', description: 'Tambah Pegawai Baru' },
     { command: 'hapus_akses', description: 'Cabut akses Pegawai' },
